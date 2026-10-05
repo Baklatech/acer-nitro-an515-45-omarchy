@@ -54,9 +54,10 @@ sudo modprobe acer_wmi
 sudo udevadm settle
 [[ -w $kb/per_zone_mode ]] || die "нет доступа на запись в $kb — модуль или правило udev не сработали"
 
-step "Скрипт kbd-backlight и восстановление цвета после загрузки"
+step "Скрипт kbd-backlight и хуки Omarchy: после загрузки и при смене темы"
 install -Dm755 "$repo/bin/kbd-backlight" "$HOME/.local/bin/kbd-backlight"
 install -Dm755 "$repo/hooks/kbd-backlight-restore" "$HOME/.config/omarchy/hooks/post-boot.d/kbd-backlight-restore"
+install -Dm755 "$repo/hooks/kbd-backlight-theme" "$HOME/.config/omarchy/hooks/theme-set.d/kbd-backlight-theme"
 
 step "Клавиша N в Hyprland"
 if [[ ! -f $bindings ]]; then

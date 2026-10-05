@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# После смены темы Omarchy перекрашивает клавиатуру, если выбран пресет с цветом темы.
+"$HOME/.local/bin/kbd-backlight" restore

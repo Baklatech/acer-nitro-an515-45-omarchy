@@ -9,7 +9,9 @@ bindings=$HOME/.config/hypr/bindings.lua
   exit 1
 }
 
-rm -f "$HOME/.local/bin/kbd-backlight" "$HOME/.config/omarchy/hooks/post-boot.d/kbd-backlight-restore"
+rm -f "$HOME/.local/bin/kbd-backlight" \
+  "$HOME/.config/omarchy/hooks/post-boot.d/kbd-backlight-restore" \
+  "$HOME/.config/omarchy/hooks/theme-set.d/kbd-backlight-theme"
 rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/kbd-backlight"
 
 if [[ -f $bindings ]] && grep -q 'kbd-backlight' "$bindings"; then
