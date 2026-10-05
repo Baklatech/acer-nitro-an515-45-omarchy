@@ -9,6 +9,7 @@ bindings=$HOME/.config/hypr/bindings.lua
   exit 1
 }
 
+systemctl --user stop kbd-backlight-shift.service 2>/dev/null || true
 rm -f "$HOME/.local/bin/kbd-backlight" \
   "$HOME/.config/omarchy/hooks/post-boot.d/kbd-backlight-restore" \
   "$HOME/.config/omarchy/hooks/theme-set.d/kbd-backlight-theme"
