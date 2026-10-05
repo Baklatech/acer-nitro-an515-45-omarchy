@@ -62,14 +62,16 @@ install -Dm755 "$repo/hooks/kbd-backlight-theme" "$HOME/.config/omarchy/hooks/th
 step "Клавиша N в Hyprland"
 if [[ ! -f $bindings ]]; then
   echo "Нет $bindings — привязку добавьте вручную (см. README)"
-elif grep -q 'kbd-backlight' "$bindings"; then
-  echo "Привязка уже есть"
+elif grep -q 'kbd-backlight next' "$bindings" && grep -q 'kbd-backlight prev' "$bindings"; then
+  echo "Привязки уже есть"
 else
   cp "$bindings" "$bindings.bak.$(date +%s)"
+  sed -i '/^-- Клавиша N (NitroSense)/d; /kbd-backlight \(next\|prev\)/d' "$bindings"
   cat >>"$bindings" <<'LUA'
 
--- Клавиша N (NitroSense): следующий цвет подсветки клавиатуры.
+-- Клавиша N (NitroSense): следующий цвет подсветки клавиатуры, с Shift — предыдущий.
 o.bind("XF86Presentation", "Keyboard backlight color", os.getenv("HOME") .. "/.local/bin/kbd-backlight next")
+o.bind("SHIFT + XF86Presentation", "Keyboard backlight previous color", os.getenv("HOME") .. "/.local/bin/kbd-backlight prev")
 LUA
   if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
     hyprctl reload >/dev/null

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Подсветка клавиатуры Acer Nitro (4 зоны) через модуль acer-wmi-linuwu.
 #   kbd-backlight next      следующий пресет по кругу (клавиша N)
+#   kbd-backlight prev      предыдущий пресет (Shift + N)
 #   kbd-backlight restore   вернуть последний пресет (после загрузки)
 #   kbd-backlight list      показать пресеты
 
@@ -15,12 +16,9 @@ THEME=$HOME/.local/state/omarchy/current/theme
 #   theme         (пусто) — ровный цвет текущей темы Omarchy
 #   theme-zones   четыре имени цветов из colors.toml темы — по одному на зону
 #   theme-effect  режим,скорость,направление — эффект цветом темы
-#   theme-shift   четыре имени цветов, пауза между кадрами в секундах и число
-#                 кадров на один сдвиг (по умолчанию 1, то есть ступенькой) —
-#                 палитра темы бежит по зонам; прошивка так не умеет, поэтому
-#                 цвета двигает фоновый процесс (юнит kbd-backlight-shift).
-#                 Каждый кадр занимает около 40 мс процессора, так что плавный
-#                 вариант заметно нагружает одно ядро.
+#   theme-shift   четыре имени цветов и пауза в секундах — палитра темы бежит
+#                 по зонам; прошивка так не умеет, поэтому цвета двигает
+#                 фоновый процесс (юнит kbd-backlight-shift)
 # Режимы: 1 дыхание, 2 неон, 3 волна, 4 сдвиг, 5 зум. Метеор (6) и мерцание (7)
 # на AN515-45 не работают.
 # Скорость 0–9, направление 1 справа налево или 2 слева направо.
@@ -36,8 +34,7 @@ PRESETS=(
   "Тема Omarchy|theme|"
   "Тема: палитра|theme-zones|red,yellow,green,blue"
   "Тема: дыхание|theme-effect|1,4,0"
-  "Тема: бегущая палитра|theme-shift|red,yellow,green,blue,0.6"
-  "Тема: плавная палитра|theme-shift|red,yellow,green,blue,0.07,4"
+  "Тема: бегущая палитра|theme-shift|red,yellow,green,blue,0.35"
   "Тема: зум|theme-effect|5,5,0"
   "Тема: сдвиг|theme-effect|4,5,1"
   "Неон|effect|2,4,100,0,0,0,0"
@@ -120,8 +117,9 @@ current=0
 [[ $current =~ ^[0-9]+$ ]] && ((current < ${#PRESETS[@]})) || current=0
 
 case ${1:-next} in
-next)
-  index=$(((current + 1) % ${#PRESETS[@]}))
+next | prev)
+  [[ ${1:-next} == prev ]] && step=-1 || step=1
+  index=$(((current + step + ${#PRESETS[@]}) % ${#PRESETS[@]}))
   if name=$(apply "$index"); then
     mkdir -p "$(dirname "$STATE")"
     echo "$index" >"$STATE"
@@ -138,37 +136,15 @@ restore)
 shift-loop)
   # Внутренняя команда: крутит цвета палитры по зонам, пока юнит не остановят
   IFS=',' read -r -a args <<<"$2"
-  pause=${args[4]:-0.6}
-  steps=${args[5]:-1}
-
   colors=()
   for name in "${args[@]:0:4}"; do
     colors+=("$(palette_color "$name")")
   done
 
-  # Все кадры считаются заранее: зона плавно переходит от своего цвета к цвету соседней
-  frames=()
-  for ((shift = 0; shift < 4; shift++)); do
-    for ((step = 0; step < steps; step++)); do
-      frame=""
-      for ((zone = 0; zone < 4; zone++)); do
-        from=${colors[$(((zone - shift + 4) % 4))]}
-        to=${colors[$(((zone - shift + 3) % 4))]}
-        for offset in 0 2 4; do
-          a=$((16#${from:offset:2})) b=$((16#${to:offset:2}))
-          frame+=$(printf '%02x' $(((a * (steps - step) + b * step) / steps)))
-        done
-        frame+=","
-      done
-      frames+=("${frame}100")
-    done
-  done
-
   while :; do
-    for frame in "${frames[@]}"; do
-      echo "$frame" >"$KB/per_zone_mode" || exit 1
-      sleep "$pause"
-    done
+    echo "${colors[0]},${colors[1]},${colors[2]},${colors[3]},100" >"$KB/per_zone_mode" || exit 1
+    colors=("${colors[3]}" "${colors[@]:0:3}")
+    sleep "${args[4]:-0.35}"
   done
   ;;
 list)
@@ -178,7 +154,7 @@ list)
   done
   ;;
 *)
-  echo "Использование: kbd-backlight [next|restore|list]" >&2
+  echo "Использование: kbd-backlight [next|prev|restore|list]" >&2
   exit 2
   ;;
 esac

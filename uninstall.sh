@@ -17,7 +17,7 @@ rm -rf "${XDG_STATE_HOME:-$HOME/.local/state}/kbd-backlight"
 
 if [[ -f $bindings ]] && grep -q 'kbd-backlight' "$bindings"; then
   cp "$bindings" "$bindings.bak.$(date +%s)"
-  sed -i '/^-- Клавиша N (NitroSense)/d; /kbd-backlight next/d' "$bindings"
+  sed -i '/^-- Клавиша N (NitroSense)/d; /kbd-backlight \(next\|prev\)/d' "$bindings"
   [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && hyprctl reload >/dev/null
 fi
 
