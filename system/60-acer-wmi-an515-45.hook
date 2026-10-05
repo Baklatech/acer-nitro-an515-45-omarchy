@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/src/acer-wmi-linuwu-*/dkms.conf
+
+[Action]
+Description = Patching acer-wmi for the Nitro AN515-45 keyboard
+When = PostTransaction
+Exec = /usr/local/sbin/acer-wmi-an515-45-patch

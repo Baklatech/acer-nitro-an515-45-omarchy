@@ -1,0 +1,67 @@
+#!/bin/bash
+# Подсветка клавиатуры Acer Nitro (4 зоны) через модуль acer-wmi-linuwu.
+#   kbd-backlight next      следующий пресет по кругу (клавиша N)
+#   kbd-backlight restore   вернуть последний пресет (после загрузки)
+#   kbd-backlight list      показать пресеты
+
+KB=/sys/devices/platform/acer-wmi/four_zoned_kb
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/kbd-backlight/preset
+
+# Формат: "название|zones|RRGGBB,RRGGBB,RRGGBB,RRGGBB,яркость" — зоны слева направо,
+# или "название|effect|режим,скорость,яркость,направление,R,G,B" (режим 3 — волна).
+PRESETS=(
+  "Белый|zones|ffffff,ffffff,ffffff,ffffff,100"
+  "Красный|zones|ff0000,ff0000,ff0000,ff0000,100"
+  "Оранжевый|zones|ff5000,ff5000,ff5000,ff5000,100"
+  "Зелёный|zones|00ff00,00ff00,00ff00,00ff00,100"
+  "Бирюзовый|zones|00ffff,00ffff,00ffff,00ffff,100"
+  "Синий|zones|0000ff,0000ff,0000ff,0000ff,100"
+  "Фиолетовый|zones|a000ff,a000ff,a000ff,a000ff,100"
+  "Четыре цвета|zones|ff0000,ffb000,00ff60,0060ff,100"
+  "Радуга|effect|3,4,100,1,0,0,0"
+  "Выключена|zones|000000,000000,000000,000000,0"
+)
+
+apply() {
+  local name kind value
+  IFS='|' read -r name kind value <<<"${PRESETS[$1]}"
+
+  case $kind in
+  zones) echo "$value" >"$KB/per_zone_mode" ;;
+  effect) echo "$value" >"$KB/four_zone_mode" ;;
+  esac || return 1
+
+  echo "$name"
+}
+
+current=0
+[[ -r $STATE ]] && current=$(<"$STATE")
+[[ $current =~ ^[0-9]+$ ]] && ((current < ${#PRESETS[@]})) || current=0
+
+case ${1:-next} in
+next)
+  index=$(((current + 1) % ${#PRESETS[@]}))
+  if name=$(apply "$index"); then
+    mkdir -p "$(dirname "$STATE")"
+    echo "$index" >"$STATE"
+    notify-send -t 1500 -h string:x-canonical-private-synchronous:kbd-backlight "Подсветка клавиатуры" "$name"
+  else
+    notify-send -u critical "Подсветка клавиатуры" "Не удалось записать в $KB"
+    exit 1
+  fi
+  ;;
+restore)
+  # На первом запуске ничего не трогаем
+  [[ -r $STATE ]] && apply "$current" >/dev/null
+  ;;
+list)
+  for i in "${!PRESETS[@]}"; do
+    ((i == current)) && mark="*" || mark=" "
+    echo "$mark $i ${PRESETS[$i]%%|*}"
+  done
+  ;;
+*)
+  echo "Использование: kbd-backlight [next|restore|list]" >&2
+  exit 2
+  ;;
+esac

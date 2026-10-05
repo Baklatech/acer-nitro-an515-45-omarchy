@@ -1,0 +1,2 @@
+# Разрешает группе wheel менять подсветку клавиатуры без sudo.
+ACTION=="add|bind", SUBSYSTEM=="platform", KERNEL=="acer-wmi", RUN+="/bin/sh -c 'chgrp wheel /sys/devices/platform/acer-wmi/four_zoned_kb/*_mode && chmod 664 /sys/devices/platform/acer-wmi/four_zoned_kb/*_mode'"

@@ -1,0 +1,25 @@
+#!/bin/bash
+# Включает альтернативный протокол подсветки для Nitro AN515-45 в исходниках
+# acer-wmi-linuwu (DKMS). Без него статические цвета гасят клавиатуру.
+# Запускается pacman-хуком до пересборки DKMS; повторный запуск безопасен.
+
+start='^static struct quirk_entry quirk_acer_nitro_v4_four_zone = {'
+
+for src in /usr/src/acer-wmi-linuwu-*/src/acer-wmi.c; do
+  [[ -f $src ]] || continue
+
+  if sed -n "/$start/,/^};/p" "$src" | grep -q 'four_zone_kbd_alt'; then
+    echo "acer-wmi AN515-45: уже пропатчено: $src"
+    continue
+  fi
+
+  sed -i "/$start/,/^};/ s/^\t\.four_zone_kbd = true,\$/&\n\t.four_zone_kbd_alt = true,/" "$src"
+
+  if sed -n "/$start/,/^};/p" "$src" | grep -q 'four_zone_kbd_alt'; then
+    echo "acer-wmi AN515-45: пропатчено: $src"
+  else
+    echo "acer-wmi AN515-45: ВНИМАНИЕ: исходник изменился, патч не применился: $src" >&2
+  fi
+done
+
+exit 0
