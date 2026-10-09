@@ -14,10 +14,11 @@ THEME=$HOME/.local/state/omarchy/current/theme
 #   zones         RRGGBB,RRGGBB,RRGGBB,RRGGBB,яркость — зоны слева направо
 #   effect        режим,скорость,яркость,направление,R,G,B
 #   theme         (пусто) — ровный цвет текущей темы Omarchy
-#   theme-zones   четыре имени цветов из colors.toml темы — по одному на зону
+#   theme-zones   четыре имени цветов из colors.toml темы — по одному на зону,
+#                 либо auto — самые непохожие друг на друга цвета темы
 #   theme-effect  режим,скорость,направление — эффект цветом темы
-#   theme-shift   четыре имени цветов и пауза в секундах — палитра темы бежит
-#                 по зонам; прошивка так не умеет, поэтому цвета двигает
+#   theme-shift   цвета как в theme-zones и пауза в секундах — палитра темы
+#                 бежит по зонам; прошивка так не умеет, поэтому цвета двигает
 #                 фоновый процесс (юнит kbd-backlight-shift)
 # Режимы: 1 дыхание, 2 неон, 3 волна, 4 сдвиг, 5 зум. Метеор (6) и мерцание (7)
 # на AN515-45 не работают.
@@ -32,9 +33,9 @@ PRESETS=(
   "Фиолетовый|zones|a000ff,a000ff,a000ff,a000ff,100"
   "Четыре цвета|zones|ff0000,ffb000,00ff60,0060ff,100"
   "Тема Omarchy|theme|"
-  "Тема: палитра|theme-zones|red,yellow,green,blue"
+  "Тема: палитра|theme-zones|auto"
   "Тема: дыхание|theme-effect|1,4,0"
-  "Тема: бегущая палитра|theme-shift|red,yellow,green,blue,0.35"
+  "Тема: бегущая палитра|theme-shift|auto,0.35"
   "Тема: зум|theme-effect|5,5,0"
   "Тема: сдвиг|theme-effect|4,5,1"
   "Неон|effect|2,4,100,0,0,0,0"
@@ -58,10 +59,13 @@ vivid() {
   printf '%02x%02x%02x' $((r * 255 / max)) $((g * 255 / max)) $((b * 255 / max))
 }
 
-# Цвет из colors.toml текущей темы Omarchy по имени, например "accent" или "red"
+# Цвет из colors.toml текущей темы Omarchy по имени, например "accent" или "red".
+# Имена разворачивает сам Omarchy: в старых темах вместо red/yellow/green/blue
+# записаны color0…color15.
 palette_color() {
   local hex
-  hex=$(sed -n "s/^$1 *= *\"#\([0-9a-fA-F]\{6\}\)\".*/\1/p" "$THEME/colors.toml" 2>/dev/null | head -n1)
+  hex=$(omarchy-theme-color --file "$THEME/colors.toml" "$1" 2>/dev/null)
+  hex=${hex#\#}
   [[ $hex =~ ^[0-9a-fA-F]{6}$ ]] || hex=ffffff
   vivid "$hex"
 }
@@ -77,15 +81,76 @@ theme_color() {
   fi
 }
 
+# Цвета темы, сильнее всего отличающиеся друг от друга, по одному на зону.
+# Начинает с цвета клавиатуры и добирает самые далёкие от уже выбранных из всей
+# палитры: в темах, где red/yellow/green/blue — один и тот же оттенок, второй
+# цвет часто есть только у текста. Серые и тёмные цвета пропускает — vivid
+# сделал бы из них случайный яркий. Если разных цветов меньше четырёх, они
+# повторяются.
+auto_palette() {
+  local key value hex r g b max min c p d near best far
+  local -a pool=() picked
+
+  picked=("$(theme_color)")
+
+  while IFS=$'\t' read -r key value; do
+    [[ $value =~ ^#([0-9a-fA-F]{6})$ ]] || continue
+    hex=${BASH_REMATCH[1]}
+    r=$((16#${hex:0:2})) g=$((16#${hex:2:2})) b=$((16#${hex:4:2}))
+    max=$((r > g ? r : g)) max=$((max > b ? max : b))
+    min=$((r < g ? r : g)) min=$((min < b ? min : b))
+    ((max >= 96 && max - min >= 48)) && pool+=("$(vivid "$hex")")
+  done < <(omarchy-theme-color --file "$THEME/colors.toml" --all 2>/dev/null)
+
+  while ((${#picked[@]} < 4)); do
+    best="" far=0
+    for c in "${pool[@]}"; do
+      near=765
+      for p in "${picked[@]}"; do
+        r=$((16#${c:0:2} - 16#${p:0:2})) g=$((16#${c:2:2} - 16#${p:2:2})) b=$((16#${c:4:2} - 16#${p:4:2}))
+        d=$((${r#-} + ${g#-} + ${b#-}))
+        ((d < near)) && near=$d
+      done
+      ((near > far)) && far=$near best=$c
+    done
+    # Ближе этого цвета на светодиодах уже не различить
+    ((far >= 90)) || break
+    picked+=("$best")
+  done
+
+  case ${#picked[@]} in
+  1) echo "${picked[0]},${picked[0]},${picked[0]},${picked[0]}" ;;
+  2) echo "${picked[0]},${picked[0]},${picked[1]},${picked[1]}" ;;
+  3) echo "${picked[0]},${picked[1]},${picked[2]},${picked[1]}" ;;
+  *) echo "${picked[0]},${picked[1]},${picked[2]},${picked[3]}" ;;
+  esac
+}
+
+# Цвета четырёх зон через запятую: "auto" либо четыре имени из colors.toml
+zone_colors() {
+  local -a names
+  IFS=',' read -r -a names <<<"$1"
+
+  if [[ ${names[0]} == auto ]]; then
+    auto_palette
+  else
+    echo "$(palette_color "${names[0]}"),$(palette_color "${names[1]}"),$(palette_color "${names[2]}"),$(palette_color "${names[3]}")"
+  fi
+}
+
 SHIFT_UNIT=kbd-backlight-shift
 
 apply() {
-  local name kind value color mode speed direction names
+  local name kind value color mode speed direction
   IFS='|' read -r name kind value <<<"${PRESETS[$1]}"
 
   # Любой другой пресет останавливает бегущую палитру
   systemctl --user stop "$SHIFT_UNIT.service" 2>/dev/null
   systemctl --user reset-failed "$SHIFT_UNIT.service" 2>/dev/null
+
+  # От батареи бегущая палитра стоит на месте: фоновый процесс, который двигает
+  # цвета, будит процессор три раза в секунду и тратит заряд
+  [[ $kind == theme-shift && $(cat /sys/class/power_supply/ACAD/online 2>/dev/null) == 0 ]] && kind=theme-zones value=${value%,*}
 
   case $kind in
   zones) echo "$value" >"$KB/per_zone_mode" ;;
@@ -95,8 +160,7 @@ apply() {
     echo "$color,$color,$color,$color,100" >"$KB/per_zone_mode"
     ;;
   theme-zones)
-    IFS=',' read -r -a names <<<"$value"
-    echo "$(palette_color "${names[0]}"),$(palette_color "${names[1]}"),$(palette_color "${names[2]}"),$(palette_color "${names[3]}"),100" >"$KB/per_zone_mode"
+    echo "$(zone_colors "$value"),100" >"$KB/per_zone_mode"
     ;;
   theme-shift)
     [[ -w $KB/per_zone_mode ]] &&
@@ -135,16 +199,13 @@ restore)
   ;;
 shift-loop)
   # Внутренняя команда: крутит цвета палитры по зонам, пока юнит не остановят
-  IFS=',' read -r -a args <<<"$2"
-  colors=()
-  for name in "${args[@]:0:4}"; do
-    colors+=("$(palette_color "$name")")
-  done
+  # Последнее поле — пауза, перед ним цвета
+  IFS=',' read -r -a colors <<<"$(zone_colors "${2%,*}")"
 
   while :; do
     echo "${colors[0]},${colors[1]},${colors[2]},${colors[3]},100" >"$KB/per_zone_mode" || exit 1
     colors=("${colors[3]}" "${colors[@]:0:3}")
-    sleep "${args[4]:-0.35}"
+    sleep "${2##*,}"
   done
   ;;
 list)
