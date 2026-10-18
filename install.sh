@@ -61,7 +61,7 @@ install -Dm755 "$repo/hooks/kbd-backlight-theme" "$HOME/.config/omarchy/hooks/th
 
 step "Клавиша N в Hyprland"
 if [[ ! -f $bindings ]]; then
-  echo "Нет $bindings — привязку добавьте вручную (см. README)"
+  echo "Нет $bindings — привязку добавьте вручную (см. docs/guide.md)"
 elif grep -q 'kbd-backlight next' "$bindings" && grep -q 'kbd-backlight prev' "$bindings"; then
   echo "Привязки уже есть"
 else
