@@ -66,3 +66,7 @@ kbd-backlight restore   # применить последний выбранны
 ## Проверено на
 
 Nitro AN515-45, BIOS V1.08, ядро 7.2.5-omarchy, `acer-wmi-linuwu` 7.3.0.1.r68.
+
+## Лицензия
+
+GPL-3.0-or-later, см. [LICENSE](LICENSE).
