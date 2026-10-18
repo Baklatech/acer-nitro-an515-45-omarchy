@@ -5,7 +5,7 @@
 ## Установка
 
 ```sh
-git clone https://github.com/Gnome627/acer-nitro-an515-45-omarchy.git
+git clone https://github.com/Baklatech/acer-nitro-an515-45-omarchy.git
 cd acer-nitro-an515-45-omarchy
 ./install.sh
 ```
